@@ -1,10 +1,5 @@
 package com.listen.permission.lib;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -19,6 +14,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.util.SparseArray;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+
 /**
  * @author listen
  * @desc 6.0权限工具类
@@ -26,6 +27,8 @@ import android.util.SparseArray;
 public class PermissionUtil {
 
     private static final String TAG = "PermissionUtil";
+
+    private static final boolean DEBUG = true;
 
     private static final int DEFAULT_PERMISSION_REQUEST_CODE = 10001;// 在没有设置requestCode情况下的默认值
 
@@ -39,50 +42,37 @@ public class PermissionUtil {
      * @author listen
      * @date 2017/2/24 09:44
      */
-    public static void requestWithDialog(final Context context, String message, final List<String> permissions,
-        final OnPermissionListener listener) {
-        if (isContextDestroyed(context)) {
-            return;
-        }
-
-        if (null == listener) {
-            Log.e(TAG, "OnPermissionListener can not be null");
-            return;
-        }
-
-        ArrayList<String> denyPermissions = getDenyPermissions(context, permissions);
-
-        if (!isListEmpty(denyPermissions)) {
-            ArrayList<String> foreverDenyPermissions = getForeverDenyPermissions(context, permissions);
-            if (!isListEmpty(foreverDenyPermissions)) {
-                /** 如果当前申请的权限中, 有foeverNever的权限, 则弹框提示去权限设置页面 */
-                PermissionDialog.showNeverAskDialog(context, message);
-            } else {
-                PermissionDialog.showAskBeforeRequestDialog(context, message, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        request(context, DEFAULT_PERMISSION_REQUEST_CODE, permissions, listener);
-                    }
-                });
-            }
-        } else {
-            /** 如果申请的权限都已经授权了, 直接成功回调 */
-            listener.onGrant();
-            listener.always(Collections.EMPTY_LIST, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
-        }
-    }
-
     public static void requestWithDialog(final Context context, String message, final String[] permissions,
         final OnPermissionListener listener) {
-        requestWithDialog(context, message, Arrays.asList(permissions), listener);
-    }
 
-    public static void request(Context context, List<String> permissions, OnPermissionListener listener) {
-        request(context, DEFAULT_PERMISSION_REQUEST_CODE, permissions, listener);
+        checkContext(context);
+        checkNull(listener, "OnPermissionListener can not be null");
+
+        final ArrayList<String> denyPermission = getDenyPermissions(context, permissions);
+        if (isPermissionGranted(denyPermission.toArray(new String[denyPermission.size()]))) {
+            /** 如果申请的权限都已经授权了, 直接成功回调 */
+            listener.onGrant();
+            listener.always(Arrays.asList(permissions), Collections.EMPTY_LIST, Collections.EMPTY_LIST);
+            return;
+        }
+
+        ArrayList<String> foreverDenyPermissions = getForeverDenyPermissions(context, permissions);
+        if (!isListEmpty(foreverDenyPermissions)) {
+            /** 如果当前申请的权限中, 有foeverNever的权限, 则弹框提示去权限设置页面 */
+            PermissionDialog.showNeverAskDialog(context, message);
+        } else {
+            PermissionDialog.showAskBeforeRequestDialog(context, message, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    request(context, DEFAULT_PERMISSION_REQUEST_CODE,
+                        denyPermission.toArray(new String[denyPermission.size()]), listener);
+                }
+            });
+        }
     }
 
     public static void request(Context context, String[] permissions, OnPermissionListener listener) {
-        request(context, DEFAULT_PERMISSION_REQUEST_CODE, Arrays.asList(permissions), listener);
+        request(context, DEFAULT_PERMISSION_REQUEST_CODE, permissions, listener);
     }
 
     /**
@@ -91,60 +81,48 @@ public class PermissionUtil {
      * @date 2017/2/24 09:44
      */
     @TargetApi(Build.VERSION_CODES.M)
-    public static void request(final Context context, int requestCode, List<String> permissions,
+    public static void request(final Context context, int requestCode, String[] permissions,
         OnPermissionListener listener) {
 
-        if (isContextDestroyed(context)) {
-            return;
-        }
+        checkContext(context);
+        checkNull(listener, "OnPermissionListener can not be null");
 
-        if (null == listener) {
-            Log.e(TAG, "OnPermissionListener can not be null");
-            return;
-        }
+        ArrayList<String> denyPermission = getDenyPermissions(context, permissions);
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+        if (isPermissionGranted(denyPermission.toArray(new String[denyPermission.size()]))) {
+            /** 如果申请的权限都已经授权了,直接成功回调 */
+            /** 小米系统, 或是targetSDK<23的情况, 只要在manifest注册了, 就默认授权, 小米手机会自己的运行时权限流程 */
             listener.onGrant();
-            listener.always(Collections.EMPTY_LIST, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
+            listener.always(Arrays.asList(permissions), Collections.EMPTY_LIST, Collections.EMPTY_LIST);
             return;
         }
 
-        if (null == mPermissionRequestList) {
-            mPermissionRequestList = new SparseArray<>();
-        }
-
-        if (context instanceof AppCompatActivity) {
-
-            /** 获取未授权成功的权限 */
-            ArrayList<String> denyPermissions = getDenyPermissions(context, permissions);
-
-            if (!isListEmpty(denyPermissions)) {
-
-                final int code = requestCode > -1 ? requestCode : DEFAULT_PERMISSION_REQUEST_CODE;
-                synchronized (PermissionUtil.class) {
-                    if (null != mPermissionRequestList.get(code)) {
-                        /** 当前权限请求已经存在,不重复添加 */
-                        Log.e(TAG, "the same permission is requesting");
-                    } else {
-                        /** 将当前权限请求加入队列 */
-                        /** 如果一个页面中存在分别触发A, B多个权限的情况, 则最好将不同权限申请对应不同的requestCode, 存入SparseArray分别处理 */
-                        mPermissionRequestList.put(code, listener);
-                        Log.e(TAG, "add permission=" + mPermissionRequestList.toString());
-
-                        /** 执行权限申请 */
-                        ((AppCompatActivity) context).requestPermissions(
-                            denyPermissions.toArray(new String[denyPermissions.size()]), requestCode);
-                    }
-                }
+        /** 存在未授权的权限 */
+        final int code = getRequestCode(requestCode);
+        synchronized (getPermissionRequestList()) {
+            if (null != getPermissionRequestList().get(code)) {
+                /** 当前权限请求已经存在,不重复添加 */
+                log("the same permission is requesting");
             } else {
-                /** 如果申请的权限都已经授权了,直接成功回调 */
-                /** 小米系统, 或是targetSDK<23的情况, 只要在manifest注册了, 就默认授权, 小米手机会自己的运行时权限流程 */
-                listener.onGrant();
-                listener.always(Collections.EMPTY_LIST, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
+                /** 将当前权限请求加入队列 */
+                /** 如果一个页面中存在分别触发A, B多个权限的情况, 则最好将不同权限申请对应不同的requestCode, 存入SparseArray分别处理 */
+                getPermissionRequestList().put(code, listener);
+                log("add permission=[%s]", getPermissionRequestList().toString());
+
+                /** 执行权限申请 */
+                ActivityCompat.requestPermissions((AppCompatActivity) context,
+                    denyPermission.toArray(new String[denyPermission.size()]), requestCode);
             }
-        } else {
-            Log.e(TAG, "Context must be an AppCompatActivity");
         }
+    }
+
+    /**
+    * @desc true: 如果没有未授权的权限, 或sdk<23
+    * @author listen
+    * @date 2017/2/25 13:08
+    */
+    private static boolean isPermissionGranted(String[] permissions) {
+        return isListEmpty(permissions) || (Build.VERSION.SDK_INT < Build.VERSION_CODES.M);
     }
 
     /**
@@ -152,18 +130,14 @@ public class PermissionUtil {
      * @author listen
      * @date 2017/2/23 10:45
      */
-    private static ArrayList<String> getDenyPermissions(Context context, List<String> permissions) {
-        if (isContextDestroyed(context)) {
-            return null;
-        }
+    private static ArrayList<String> getDenyPermissions(Context context, String[] permissions) {
 
-        if (isListEmpty(permissions)) {
-            return null;
-        }
+        checkContext(context);
+        checkList(permissions, "permission is null");
 
         ArrayList<String> denyPermissions = new ArrayList<>();
-        for (int i = 0, len = permissions.size(); i < len; i++) {
-            String p = permissions.get(i);
+        for (int i = 0, len = permissions.length; i < len; i++) {
+            String p = permissions[i];
             if (ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_DENIED) {
                 denyPermissions.add(p);
             }
@@ -176,20 +150,16 @@ public class PermissionUtil {
      * @author listen
      * @date 2017/2/23 20:55
      */
-    private static ArrayList<String> getForeverDenyPermissions(Context context, List<String> permissions) {
-        if (isContextDestroyed(context)) {
-            return null;
-        }
+    private static ArrayList<String> getForeverDenyPermissions(Context context, String[] permissions) {
 
-        if (isListEmpty(permissions)) {
-            return null;
-        }
+        checkContext(context);
+        checkList(permissions, "permission is null");
 
         ArrayList<String> denyPermissions = new ArrayList<>();
-        for (int i = 0, len = permissions.size(); i < len; i++) {
-            String p = permissions.get(i);
+        for (int i = 0, len = permissions.length; i < len; i++) {
+            String p = permissions[i];
             if (ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_DENIED) {
-                if (ActivityCompat.shouldShowRequestPermissionRationale((AppCompatActivity) context, permissions.get(i))) {
+                if (ActivityCompat.shouldShowRequestPermissionRationale((AppCompatActivity) context, permissions[i])) {
                     /** 当用户拒绝过某个权限时,shouldShowRequestPermissionRationale返回true */
                 } else {
                     /** 如果当前权限为deny, 且shouldShowRequestPermissionRationale返回false,说明当用户勾选"never ask again" */
@@ -207,20 +177,16 @@ public class PermissionUtil {
      */
     public static void onRequestPermissionsResult(Context context, int requestCode, String[] permissions,
         int[] grantResults) {
-        if (isContextDestroyed(context)) {
-            return;
-        }
 
-        if (null == permissions || permissions.length <= 0) {
-            return;
-        }
+        checkContext(context);
+        checkList(permissions, "permission is null");
 
         final OnPermissionListener listener;
-        synchronized (PermissionUtil.class) {
-            listener = mPermissionRequestList.get(requestCode);
-            mPermissionRequestList.remove(requestCode);
+        synchronized (getPermissionRequestList()) {
+            listener = getPermissionRequestList().get(requestCode);
+            getPermissionRequestList().remove(requestCode);
         }
-        Log.e(TAG, "remove permission=" + mPermissionRequestList.toString());
+        log("remove permission=[%s]", getPermissionRequestList().toString());
 
         if (null != listener) {
             if (context instanceof AppCompatActivity) {
@@ -237,7 +203,8 @@ public class PermissionUtil {
 
                         grantPermissions.add(permissions[i]);
 
-                    } else if (ActivityCompat.shouldShowRequestPermissionRationale((AppCompatActivity) context, permissions[i])) {
+                    } else if (ActivityCompat.shouldShowRequestPermissionRationale((AppCompatActivity) context,
+                        permissions[i])) {
                         /** 当用户拒绝过某个权限时,shouldShowRequestPermissionRationale返回true */
                         denyPermissions.add(permissions[i]);
                     } else {
@@ -261,10 +228,10 @@ public class PermissionUtil {
                 listener.always(grantPermissions, denyPermissions, foreverDenyPermissions);
 
             } else {
-                Log.e(TAG, "Context must be an AppCompatActivity");
+                log("Context must be an AppCompatActivity");
             }
         } else {
-            Log.e(TAG, "request is not exists");
+            log("request is not exists");
         }
     }
 
@@ -275,19 +242,17 @@ public class PermissionUtil {
      */
     public static boolean isContextDestroyed(Context context) {
         if (null == context) {
-            Log.e(TAG, "Context can not be null");
             return true;
         }
-
         if (context instanceof AppCompatActivity) {
             AppCompatActivity activity = (AppCompatActivity) context;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                 return activity.isDestroyed() && activity.isFinishing();
             } else {
-                return ((AppCompatActivity) context).isFinishing();
+                return activity.isFinishing();
             }
         } else {
-            Log.e(TAG, "Context must be an AppCompatActivity");
+            log("Context must be an AppCompatActivity");
             return true;
         }
     }
@@ -298,10 +263,8 @@ public class PermissionUtil {
      * @date 2017/2/23 11:47
      */
     public static void intentToPermissionSetting(Context context) {
-        if (null == context) {
-            Log.e(TAG, "Context can not be null");
-            return;
-        }
+
+        checkContext(context);
 
         Intent intentAppDetail = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         intentAppDetail.setData(Uri.parse("package:" + context.getPackageName()));
@@ -329,8 +292,64 @@ public class PermissionUtil {
         }
     }
 
+    private static int getRequestCode(int requestCode) {
+        return requestCode > -1 ? requestCode : DEFAULT_PERMISSION_REQUEST_CODE;
+    }
+
+    private static SparseArray<OnPermissionListener> getPermissionRequestList() {
+        if (null == mPermissionRequestList) {
+            mPermissionRequestList = new SparseArray<>();
+        }
+        return mPermissionRequestList;
+    }
+
+    private static void checkContext(Context context) {
+        if (isContextDestroyed(context)) {
+            throw new RuntimeException("context is destoryed");
+        }
+    }
+
+    private static <T> void checkNull(T object, String message) {
+        if (null == object) {
+            throw new RuntimeException(message);
+        }
+    }
+
+    private static <T> void checkList(T[] list, String message) {
+        if (isListEmpty(list)) {
+            throw new RuntimeException(message);
+        }
+    }
+
+    private static <T> void checkList(List<T> list, String message) {
+        if (isListEmpty(list)) {
+            throw new RuntimeException(message);
+        }
+    }
+
     public static <T> boolean isListEmpty(List<T> list) {
         return list == null || list.size() <= 0;
     }
 
+    public static <T> boolean isListEmpty(T[] list) {
+        return list == null || list.length <= 0;
+    }
+
+    private static void log(String message, Object... args) {
+        if (!DEBUG) {
+            return;
+        }
+        Log.d(TAG, String.format(Locale.US, message, args));
+    }
+
+    public static void showNeverAskDialog(Context context, String message) {
+        checkContext(context);
+        PermissionDialog.showNeverAskDialog(context, message);
+    }
+
+    public static void showAskBeforeRequestDialog(Context context, String message,
+        DialogInterface.OnClickListener confirmListener) {
+        checkContext(context);
+        PermissionDialog.showAskBeforeRequestDialog(context, message, confirmListener);
+    }
 }

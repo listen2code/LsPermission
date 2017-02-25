@@ -12,10 +12,8 @@ import android.view.View;
 import android.widget.Toast;
 
 import com.listen.permission.lib.OnPermissionAdapter;
-import com.listen.permission.lib.PermissionDialog;
 import com.listen.permission.lib.PermissionUtil;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,8 +22,6 @@ import java.util.List;
  * @date 2017/2/24 15:17
  */
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-
-    private static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,10 +58,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * @date 2017/2/24 15:17
      */
     private void normal() {
-        ArrayList<String> permissions = new ArrayList<>();
-        permissions.add(Manifest.permission.CALL_PHONE);
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
-        PermissionUtil.request(MainActivity.this, permissions, new OnPermissionAdapter() {
+        final String[] permissions =
+            new String[] {Manifest.permission.CALL_PHONE, Manifest.permission.ACCESS_FINE_LOCATION};
+
+        PermissionUtil.request(this, permissions, new OnPermissionAdapter() {
             @Override
             public void onGrant() {
                 showToast("权限被同意");
@@ -80,12 +76,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onNeverAsk(List<String> permissions) {
                 showToast("用户拒绝授权, 并勾选 never ask again " + permissions.toString());
-                PermissionDialog.showNeverAskDialog(MainActivity.this, "这个权限很重要");
+                PermissionUtil.showNeverAskDialog(MainActivity.this, "这个权限很重要");
             }
 
             @Override
-            public void always(List<String> grantPermissions, List<String> denyPermissions, List<String> foreverDenyPermissions) {
-                showToast("授权: " + grantPermissions.toString() + "\n 拒绝: " + denyPermissions.toString() + "\n never ask: " + foreverDenyPermissions.toString());
+            public void always(List<String> grantPermissions, List<String> denyPermissions,
+                List<String> foreverDenyPermissions) {
+                showToast("授权: " + grantPermissions.toString() + "\n 拒绝: " + denyPermissions.toString()
+                    + "\n never ask: " + foreverDenyPermissions.toString());
             }
         });
     }
@@ -95,45 +93,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * @author listen
      * @date 2017/2/24 15:17
      */
+    int index = 0;
+
     private void weixinPermission() {
-        final ArrayList<String> permissions = new ArrayList<>();
-        permissions.add(Manifest.permission.CALL_PHONE);
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        final String[] permissions =
+            new String[] {Manifest.permission.CALL_PHONE, Manifest.permission.ACCESS_FINE_LOCATION};
 
-        for (int i = 0; i < permissions.size(); i++) {
-            final int index = i;
-            PermissionUtil.request(MainActivity.this, new String[]{permissions.get(index)}, new OnPermissionAdapter() {
-                @Override
-                public void onGrant() {
-                    showToast("权限被同意");
-                    if ((index + 1) <= permissions.size() - 1) {
-                        PermissionUtil.request(MainActivity.this, new String[]{permissions.get(index + 1)}, this);
-                    }
+        PermissionUtil.request(this, new String[] {permissions[index]}, new OnPermissionAdapter() {
+            @Override
+            public void onGrant() {
+                showToast(permissions[index] + "权限被同意");
+                if ((index + 1) <= permissions.length - 1) {
+                    // 继续下个权限的申请
+                    index++;
+                    PermissionUtil.request(MainActivity.this, new String[] {permissions[index]}, this);
+                } else {
+                    // 所有权限都已经授权
+                    callPhone();
                 }
+            }
 
-                @Override
-                public void onDeny(List<String> permissions) {
-                    PermissionDialog.showNeverAskDialog(MainActivity.this, permissions.get(index) + "这个权限很重要");
-                }
+            @Override
+            public void onDeny(List<String> permissions) {
+                PermissionUtil.showNeverAskDialog(MainActivity.this, permissions.get(0) + "这个权限很重要");
+            }
 
-                @Override
-                public void onNeverAsk(List<String> permissions) {
-                    PermissionDialog.showNeverAskDialog(MainActivity.this, permissions.get(index) + "这个权限很重要");
-                }
-            });
-        }
+            @Override
+            public void onNeverAsk(List<String> permissions) {
+                PermissionUtil.showNeverAskDialog(MainActivity.this, permissions.get(0) + "这个权限很重要");
+            }
+        });
     }
 
     /**
-     * @desc 支付宝模式: 申请单个权限, 拒绝则弹框并继续申请, 拒绝且"never ask"则弹框并引导去设置页面
+     * @desc 支付宝模式: 申请单个权限, 拒绝则显示弹框并继续申请, 拒绝且"never ask"则弹框并引导去设置页面
      * @author listen
      * @date 2017/2/24 15:18
      */
     private void alipayPermission() {
-        final ArrayList<String> permissions = new ArrayList<>();
-        permissions.add(Manifest.permission.CALL_PHONE);
+        final String[] permissions = new String[] {Manifest.permission.CALL_PHONE};
 
-        PermissionUtil.requestWithDialog(MainActivity.this, "需要电话权限", permissions, new OnPermissionAdapter() {
+        PermissionUtil.requestWithDialog(this, "需要电话权限", permissions, new OnPermissionAdapter() {
             @Override
             public void onGrant() {
                 showToast("权限被同意");
@@ -142,12 +142,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             @Override
             public void onDeny(List<String> permissions) {
-                PermissionUtil.requestWithDialog(MainActivity.this, "需要电话权限", permissions, this);
+                PermissionUtil.requestWithDialog(MainActivity.this, "需要电话权限",
+                    permissions.toArray(new String[permissions.size()]), this);
             }
 
             @Override
             public void onNeverAsk(List<String> permissions) {
-                PermissionDialog.showNeverAskDialog(MainActivity.this, "需要电话权限");
+                PermissionUtil.showNeverAskDialog(MainActivity.this, "电话权限为必须");
             }
         });
     }
@@ -158,14 +159,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * @date 2017/2/24 15:18
      */
     private void baiduMapPermission() {
-        ArrayList<String> permissions = new ArrayList<>();
-        permissions.add(Manifest.permission.CALL_PHONE);
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        final String[] permissions =
+            new String[] {Manifest.permission.CALL_PHONE, Manifest.permission.ACCESS_FINE_LOCATION};
 
-        PermissionUtil.requestWithDialog(MainActivity.this, "需要电话(必要), 位置权限(非必要)", permissions, new OnPermissionAdapter() {
+        PermissionUtil.requestWithDialog(this, "需要电话(必要), 位置权限(非必要)", permissions, new OnPermissionAdapter() {
             @Override
             public void onGrant() {
                 showToast("权限被同意");
+                callPhone();
             }
 
             @Override
@@ -173,7 +174,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (permissions.contains(Manifest.permission.CALL_PHONE)) {
                     // 必须权限
                     PermissionUtil.requestWithDialog(MainActivity.this, "需要电话权限",
-                            new String[]{Manifest.permission.CALL_PHONE}, this);
+                        new String[] {Manifest.permission.CALL_PHONE}, this);
                 }
             }
 
@@ -181,7 +182,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             public void onNeverAsk(List<String> permissions) {
                 if (permissions.contains(Manifest.permission.CALL_PHONE)) {
                     // 必须权限
-                    PermissionDialog.showNeverAskDialog(MainActivity.this, "需要电话权限");
+                    PermissionUtil.showNeverAskDialog(MainActivity.this, "电话权限为必须");
                 }
             }
         });
@@ -206,7 +207,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         startActivity(intent);
     }
 
-    // ///////////////////////////
     private void showToast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }

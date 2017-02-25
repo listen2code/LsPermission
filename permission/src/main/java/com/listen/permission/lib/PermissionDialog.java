@@ -15,9 +15,6 @@ public class PermissionDialog {
      * @date 2017/2/23 11:53
      */
     public static void showNeverAskDialog(final Context context, String message) {
-        if (PermissionUtil.isContextDestroyed(context)) {
-            return;
-        }
         final AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle("权限申请").setMessage(message).setPositiveButton("去设置", new DialogInterface.OnClickListener() {
             @Override
@@ -43,9 +40,6 @@ public class PermissionDialog {
      */
     public static void showAskBeforeRequestDialog(final Context context, String message,
                                                   DialogInterface.OnClickListener confirmListener) {
-        if (PermissionUtil.isContextDestroyed(context)) {
-            return;
-        }
         final AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle("权限申请")
             .setMessage(message)
