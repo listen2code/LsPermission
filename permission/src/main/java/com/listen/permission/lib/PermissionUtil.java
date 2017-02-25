@@ -11,14 +11,18 @@ import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.util.SparseArray;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+
+import static com.listen.permission.lib.Util.checkContext;
+import static com.listen.permission.lib.Util.checkList;
+import static com.listen.permission.lib.Util.checkNull;
+import static com.listen.permission.lib.Util.isContextDestroyed;
+import static com.listen.permission.lib.Util.isListEmpty;
+import static com.listen.permission.lib.Util.log;
 
 /**
  * @author listen
@@ -26,9 +30,9 @@ import java.util.Locale;
  */
 public class PermissionUtil {
 
-    private static final String TAG = "PermissionUtil";
+    public static final String TAG = "PermissionUtil";
 
-    private static final boolean DEBUG = true;
+    public static final boolean DEBUG = true;
 
     private static final int DEFAULT_PERMISSION_REQUEST_CODE = 10001;// 在没有设置requestCode情况下的默认值
 
@@ -122,7 +126,11 @@ public class PermissionUtil {
     * @date 2017/2/25 13:08
     */
     private static boolean isPermissionGranted(String[] permissions) {
-        return isListEmpty(permissions) || (Build.VERSION.SDK_INT < Build.VERSION_CODES.M);
+        return isListEmpty(permissions) || isOverMarshmallow();
+    }
+
+    private static boolean isOverMarshmallow() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M;
     }
 
     /**
@@ -188,73 +196,49 @@ public class PermissionUtil {
         }
         log("remove permission=[%s]", getPermissionRequestList().toString());
 
-        if (null != listener) {
-            if (context instanceof AppCompatActivity) {
-
-                /** 授权成功的权限列表 */
-                ArrayList<String> grantPermissions = new ArrayList<>();
-                /** 获取未授权的权限列表 */
-                ArrayList<String> denyPermissions = new ArrayList<>();
-                /** 获取未授权的,并且勾选"never ask again"的权限列表 */
-                ArrayList<String> foreverDenyPermissions = new ArrayList<>();
-
-                for (int i = 0, len = grantResults.length; i < len; i++) {
-                    if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
-
-                        grantPermissions.add(permissions[i]);
-
-                    } else if (ActivityCompat.shouldShowRequestPermissionRationale((AppCompatActivity) context,
-                        permissions[i])) {
-                        /** 当用户拒绝过某个权限时,shouldShowRequestPermissionRationale返回true */
-                        denyPermissions.add(permissions[i]);
-                    } else {
-                        /** 如果当前权限为deny, 且shouldShowRequestPermissionRationale返回false,说明当用户勾选"never ask again" */
-                        foreverDenyPermissions.add(permissions[i]);
-                    }
-                }
-
-                if (isListEmpty(denyPermissions) && isListEmpty(foreverDenyPermissions) && !isContextDestroyed(context)) {
-                    listener.onGrant();
-                } else {
-                    if (!isListEmpty(denyPermissions) && !isContextDestroyed(context)) {
-                        listener.onDeny(denyPermissions);
-                    }
-
-                    if (!isListEmpty(foreverDenyPermissions) && !isContextDestroyed(context)) {
-                        listener.onNeverAsk(foreverDenyPermissions);
-                    }
-                }
-
-                listener.always(grantPermissions, denyPermissions, foreverDenyPermissions);
-
-            } else {
-                log("Context must be an AppCompatActivity");
-            }
-        } else {
+        if (null == listener) {
             log("request is not exists");
+            return;
         }
-    }
 
-    /**
-     * @desc 判断Activity是否已经销毁
-     * @author listen
-     * @date 2017/2/23 14:21
-     */
-    public static boolean isContextDestroyed(Context context) {
-        if (null == context) {
-            return true;
-        }
-        if (context instanceof AppCompatActivity) {
-            AppCompatActivity activity = (AppCompatActivity) context;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                return activity.isDestroyed() && activity.isFinishing();
+        /** 授权成功的权限列表 */
+        ArrayList<String> grantPermissions = new ArrayList<>();
+        /** 获取未授权的权限列表 */
+        ArrayList<String> denyPermissions = new ArrayList<>();
+        /** 获取未授权的,并且勾选"never ask again"的权限列表 */
+        ArrayList<String> foreverDenyPermissions = new ArrayList<>();
+
+        for (int i = 0, len = grantResults.length; i < len; i++) {
+            if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+
+                grantPermissions.add(permissions[i]);
+
+            } else if (ActivityCompat.shouldShowRequestPermissionRationale((AppCompatActivity) context, permissions[i])) {
+                /** 当用户拒绝过某个权限时,shouldShowRequestPermissionRationale返回true */
+                denyPermissions.add(permissions[i]);
             } else {
-                return activity.isFinishing();
+                /** 如果当前权限为deny, 且shouldShowRequestPermissionRationale返回false,说明当用户勾选"never ask again" */
+                foreverDenyPermissions.add(permissions[i]);
             }
-        } else {
-            log("Context must be an AppCompatActivity");
-            return true;
         }
+
+        if (isContextDestroyed(context)) {
+            return;
+        }
+
+        if (isListEmpty(denyPermissions) && isListEmpty(foreverDenyPermissions)) {
+            listener.onGrant();
+        } else {
+            if (!isListEmpty(denyPermissions)) {
+                listener.onDeny(denyPermissions);
+            }
+
+            if (!isListEmpty(foreverDenyPermissions)) {
+                listener.onNeverAsk(foreverDenyPermissions);
+            }
+        }
+
+        listener.always(grantPermissions, denyPermissions, foreverDenyPermissions);
     }
 
     /**
@@ -301,45 +285,6 @@ public class PermissionUtil {
             mPermissionRequestList = new SparseArray<>();
         }
         return mPermissionRequestList;
-    }
-
-    private static void checkContext(Context context) {
-        if (isContextDestroyed(context)) {
-            throw new RuntimeException("context is destoryed");
-        }
-    }
-
-    private static <T> void checkNull(T object, String message) {
-        if (null == object) {
-            throw new RuntimeException(message);
-        }
-    }
-
-    private static <T> void checkList(T[] list, String message) {
-        if (isListEmpty(list)) {
-            throw new RuntimeException(message);
-        }
-    }
-
-    private static <T> void checkList(List<T> list, String message) {
-        if (isListEmpty(list)) {
-            throw new RuntimeException(message);
-        }
-    }
-
-    public static <T> boolean isListEmpty(List<T> list) {
-        return list == null || list.size() <= 0;
-    }
-
-    public static <T> boolean isListEmpty(T[] list) {
-        return list == null || list.length <= 0;
-    }
-
-    private static void log(String message, Object... args) {
-        if (!DEBUG) {
-            return;
-        }
-        Log.d(TAG, String.format(Locale.US, message, args));
     }
 
     public static void showNeverAskDialog(Context context, String message) {
