@@ -1,7 +1,8 @@
 # LsPermission
 6.0运行时权限辅助工具类
 
-![运行时权限.png](http://upload-images.jianshu.io/upload_images/2157048-6aef3b76cea40e75.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![运行时权限.png](http://upload-images.jianshu.io/upload_images/2157048-973b1ef7c81f4caa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
 
 ####为什么需要6.0运行时权限
 * 更友好
