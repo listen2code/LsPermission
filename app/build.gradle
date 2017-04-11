@@ -17,7 +17,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    //执行lint检查，有任何的错误或者警告提示，都会终止构建，可以将其关掉。
+    lintOptions {
+        abortOnError false
+    }
 }
+
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
@@ -28,3 +33,5 @@ dependencies {
     testCompile 'junit:junit:4.12'
     compile project(path: ':permission')
 }
+
+tasks.getByPath(":permission:mavenAndroidJavadocs").enabled = false

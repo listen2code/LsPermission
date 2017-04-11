@@ -1,4 +1,5 @@
 apply plugin: 'com.android.library'
+apply plugin: 'com.novoda.bintray-release'
 
 android {
     compileSdkVersion 24
@@ -9,9 +10,7 @@ android {
         targetSdkVersion 24
         versionCode 1
         versionName "1.0"
-
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
-
     }
     buildTypes {
         release {
@@ -19,6 +18,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    //执行lint检查，有任何的错误或者警告提示，都会终止构建，可以将其关掉。
+    lintOptions {
+        abortOnError false
+    }
+
 }
 
 dependencies {
@@ -28,4 +32,11 @@ dependencies {
     })
     compile 'com.android.support:appcompat-v7:24.2.1'
     testCompile 'junit:junit:4.12'
+}
+
+publish {
+    userOrg = 'listen2jcenter'//bintray.com用户名
+    groupId = 'com.listen.library'//jcenter上的路径
+    artifactId = 'LsPermission'//项目名称
+    publishVersion = '1.0.0'//版本号
 }
