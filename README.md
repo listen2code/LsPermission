@@ -23,6 +23,9 @@ public void onRequestPermissionsResult(int requestCode, @NonNull String[] permis
 Step2. 使用PermissionUtil申请权限
 
 ```
+final String[] permissions =
+            new String[] {Manifest.permission.CALL_PHONE, Manifest.permission.ACCESS_FINE_LOCATION};
+            
 PermissionUtil.request(this, permissions, new OnPermissionAdapter() {
        /**
         * @desc 申请的权限全被授权
