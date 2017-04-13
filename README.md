@@ -61,8 +61,8 @@ PermissionUtil.request(this, permissions, new OnPermissionAdapter() {
 ### Blog
 [6.0运行时权限的总结与实践](https://github.com/listen2code/article/tree/master/6.0运行时权限的总结与实践)
 
-
-### License
+License
+-------
 
 ```
 Copyright 2017 listen.
@@ -79,6 +79,4 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
-
-
 
