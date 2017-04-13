@@ -1,14 +1,14 @@
-###LsPermission
+### LsPermission
 6.0运行时权限辅助工具类
 
-###Getting started
+### Getting started
 In your build.gradle:
 
 ```
 compile 'con.listen.library:LsPermission:1.0.0'
 ```
 
-###Usage
+### Usage
 
 Step1. 在BaseActivity的onRequestPermissionsResult()中接收统一的权限回调，并转交给PermissionUtil处理。
 
