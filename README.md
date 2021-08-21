@@ -62,7 +62,7 @@ PermissionUtil.request(this, permissions, new OnPermissionAdapter() {
 
 
 ### Blog
-[6.0运行时权限的总结与实践](https://github.com/listen2code/article/tree/master/6.0运行时权限的总结与实践)
+[6.0运行时权限的总结与实践](https://www.jianshu.com/p/149dd57d175c)
 
 License
 -------
